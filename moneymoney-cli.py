@@ -73,6 +73,7 @@ class MoneyMoneyDB:
     class Transaction:
         account_key: int
         amount: float
+        type: str
         purpose: str
         name: str
         category_key: int
@@ -85,7 +86,7 @@ class MoneyMoneyDB:
 
 
     def get_transactions_query (self,date_from:datetime.datetime,date_to:datetime.datetime,limit_to_accounts,only_uncategorized=False):
-        sql = f"select local_account_key, amount, unformatted_purpose, unformatted_name, category_key, timestamp from transactions where timestamp > {int(date_from.timestamp())} and timestamp < {int(date_to.timestamp())}"
+        sql = f"select local_account_key, amount, unformatted_type, unformatted_purpose, unformatted_name, category_key, timestamp from transactions where timestamp > {int(date_from.timestamp())} and timestamp < {int(date_to.timestamp())}"
         if only_uncategorized:
             sql = sql + " and category_key = 1"
         if limit_to_accounts is not None and len(limit_to_accounts) > 0:
@@ -106,6 +107,20 @@ class MoneyMoneyDB:
                 break
             for row in rows:
                 yield MoneyMoneyDB.Transaction(*row)
+
+    def get_category_usage (self, date_from: datetime.datetime, date_to: datetime.datetime, limit_to_accounts):
+        sql = f"select category_key, count(category_key) as usage from transactions where category_key!=1 and timestamp > {int(date_from.timestamp())} and timestamp < {int(date_to.timestamp())}"
+        if limit_to_accounts is not None and len(limit_to_accounts) > 0:
+            sql = sql +  " and local_account_key in ("
+            for account in limit_to_accounts:
+                sql = sql + str(account) + ","
+            sql = sql[:-1] + ")"
+        sql = sql + " group by category_key order by usage desc"
+        cursor = self._connection.cursor()
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        return {item[0]: item[1] for item in rows}
+        
 
     def get_categories(self):
         cursor = self._connection.cursor()
@@ -163,6 +178,34 @@ def list_accounts (db_password):
     print (table)
 
 
+@cli.command()
+@click.option("--db-password", help="Encryption password of moneymoney DB", required=True)
+@click.option("--date-from", type=RelativeDate(), default="2Y", help="Oldest transaction to be categorized (e.g., 1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)
+@click.option("--date-to", type=RelativeDate(), default=(datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d"), help="Newest transaction to be categorized", required=True, show_default=True)
+@click.option("--limit-to-account", help="Limit classification to transactions in the defined account. Can be provided multiple times", multiple=True)
+def list_category_usage(db_password, date_from, date_to, limit_to_account):
+    """
+    List the usage of categories in the transactions.
+
+    Parameters:
+    - db_password: Encryption password of the MoneyMoney database.
+    - date_from: Oldest transaction to be categorized (e.g., 1Y for one year ago or 2021-01-01 for an absolute date).
+    - date_to: Newest transaction to be categorized.
+    - limit_to_account: Limit classification to transactions in the defined account. Can be provided multiple times.
+
+    This function lists the usage of categories in the transactions within the specified date range and accounts.
+    """
+    db = MoneyMoneyDB(db_password)
+    category_usage = db.get_category_usage(date_from, date_to, limit_to_account)
+    table = prettytable.PrettyTable()
+    categories = db.get_categories()
+    table.field_names = ["Category ID","Category name","# of transactions"]
+    table.align = "l"
+    for category_id, usage_count in category_usage.items():
+        table.add_row([category_id, categories[category_id], usage_count])
+    print(table)
+
+
 
 
 @cli.command()
@@ -201,7 +244,7 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
     df['purpose'] = df['purpose'].fillna('no purpose')
     df['name'] = df['name'].fillna('no name')
-    X = df[['amount', 'purpose', 'name']]
+    X = df[['amount', 'purpose', 'name','type']]
 
     # Load the model
     model = joblib.load(str(db.get_data_dir().joinpath(model_name))+".pkl")
@@ -241,7 +284,8 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
 @click.option("--date-to", type=RelativeDate(), default=datetime.datetime.now().strftime("%Y-%m-%d"), help="Newest transaction to use for training (e.g., -3M for three months ago or 2021-01-01 for an absolute date)", required=True, show_default=True)
 @click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times", required=True, multiple=True)
 @click.option("--model-name", help="Specify the model name to be created", required=True, default="default", show_default=True)
-def train_model(db_password, date_from, date_to, limit_to_account,model_name):
+@click.option("--limit-to-category-file",type=click.File(), help="Provide a text file with a category ID per line to limit the training to those categories", required=False)
+def train_model(db_password, date_from, date_to, limit_to_account,model_name,limit_to_category_file):
     db = MoneyMoneyDB(db_password)
 
     # Prepare dataframe
@@ -249,7 +293,12 @@ def train_model(db_password, date_from, date_to, limit_to_account,model_name):
     df['amount'] = pd.to_numeric(df['amount'], errors='coerce')  
     df['purpose'] = df['purpose'].fillna('no purpose')
     df['name'] = df['name'].fillna('no name')
-    X = df[['amount', 'purpose', 'name']]
+
+    if limit_to_category_file is not None:
+        limit_to_category = [int(line.split()[0]) for line in limit_to_category_file]
+        df = df[df['category_key'].isin(limit_to_category)]
+
+    X = df[['amount', 'purpose', 'name','type']]
     y = df['category_key']
     tfidf = TfidfVectorizer(max_features=500)
     scaler = StandardScaler()
@@ -262,7 +311,8 @@ def train_model(db_password, date_from, date_to, limit_to_account,model_name):
         transformers=[
             ('num_amount', scaler, ['amount']),
             ('text1', tfidf, 'purpose'),
-            ('text2', tfidf, 'name')
+            ('text2', tfidf, 'name'),
+            ('text3', tfidf, 'type')
         ]
     )
 

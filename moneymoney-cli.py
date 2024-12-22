@@ -74,6 +74,7 @@ class MoneyMoneyDB:
 
     @dataclass
     class Transaction:
+        transaction_id: int
         account_key: int
         amount: float
         type: str
@@ -89,7 +90,7 @@ class MoneyMoneyDB:
 
 
     def get_transactions_query (self,date_from:datetime.datetime,date_to:datetime.datetime,limit_to_accounts,only_uncategorized=False):
-        sql = f"select local_account_key, amount, unformatted_type, unformatted_purpose, unformatted_name, category_key, timestamp from transactions where timestamp > {int(date_from.timestamp())} and timestamp < {int(date_to.timestamp())}"
+        sql = f"select rowid, local_account_key, amount, unformatted_type, unformatted_purpose, unformatted_name, category_key, timestamp from transactions where timestamp > {int(date_from.timestamp())} and timestamp < {int(date_to.timestamp())}"
         if only_uncategorized:
             sql = sql + " and category_key = 1"
         if limit_to_accounts is not None and len(limit_to_accounts) > 0:
@@ -217,8 +218,9 @@ def list_category_usage(db_password, date_from, date_to, limit_to_account):
 @click.option("--date-to", type=RelativeDate(), default=(datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d"), help="Newest transaction to be categorized", required=True, show_default=True)
 @click.option("--limit-to-account", help="Limit classification to transactions in the defined account. Can be provided multiple times", multiple=True)
 @click.option("--model-name", help="Specify the model to be used", required=True, default="default", show_default=True)
+@click.option("--propability-threshold", help="Specify the prediction threshold. Only predictions with a higher propability are conciders", required=True, default=0.75, show_default=True)
 @click.option("--apply", help="Apply the categorization to the database", is_flag=True)
-def categorize(db_password, date_from, date_to, limit_to_account, model_name, apply):
+def categorize(db_password, date_from, date_to, limit_to_account, model_name, apply, propability_threshold):
     """
     Categorize transactions using a trained machine learning model.
 
@@ -231,9 +233,7 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     - apply: Apply the categorization to the database.
 
     This function loads transactions from the MoneyMoney database, predicts their categories using a trained model,
-    and optionally updates the database with the predicted categories if the --apply flag is specified. It also prints
-    the categorized transactions along with their probabilities and a flag indicating whether the probability is above
-    the threshold.
+    and optionally updates the database with the predicted categories if the --apply flag is specified. 
     """    
     db = MoneyMoneyDB(db_password)
     transactions = list(db.get_transactions(date_from, date_to, limit_to_account, only_uncategorized=True))
@@ -260,24 +260,23 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     category_mapping = db.get_categories()
     category_names = {category_id: name for category_id, name in category_mapping.items()}
 
-    # Apply threshold and update transactions
-    threshold = 0.75
-    if apply:
-        cursor = db.get_connection().cursor()
-        for transaction, predicted_category, probabilities in zip(transactions, predicted_categories, predicted_probabilities):
-            max_probability = max(probabilities)
-            if max_probability > threshold:
-                cursor.execute(
-                    "UPDATE transactions SET category_key = ? WHERE local_account_key = ? AND timestamp = ?",
-                    (predicted_category, transaction.account_key, transaction.timestamp)
-                )
-        db.get_connection().commit()
-
-    # Print the categorized transactions with probabilities
+    df['predicted_category_id'] = predicted_categories
     df['predicted_category'] = [category_names[category] for category in predicted_categories]
     df['probability'] = predicted_probabilities
-    df['above_threshold'] = df['probability'] > threshold
-    print(df[['account_key', 'amount', 'purpose', 'name', 'timestamp', 'predicted_category', 'probability', 'above_threshold']])
+
+    # Print the categorized transactions with probabilities
+    print(df[['transaction_id','purpose', 'name','amount', 'predicted_category', 'probability']].to_string(index=False))
+
+    # Apply threshold and update transactions
+    if apply:
+        cursor = db.get_connection().cursor()
+        for transaction_id, predicted_category_id, probabilities in df[['transaction_id', 'predicted_category_id', 'probability']].values:
+            if probabilities > propability_threshold:
+                cursor.execute(
+                    "UPDATE transactions SET category_key = ? WHERE rowid = ?",
+                    (int(predicted_category_id), int(transaction_id))
+                )
+        db.get_connection().commit()
 
 
 

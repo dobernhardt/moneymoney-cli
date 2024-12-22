@@ -15,7 +15,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report
 from sklearn.compose import ColumnTransformer
 import joblib  
-
+import gensim.downloader as api
+from sklearn.pipeline import FeatureUnion
+from sklearn.base import BaseEstimator, TransformerMixin
+import numpy as np
 
 class RelativeDate(click.ParamType):
     name = "relative_date"
@@ -278,6 +281,26 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
 
 
 
+class Word2VecVectorizer(BaseEstimator, TransformerMixin):
+    def __init__(self, model_name='glove-wiki-gigaword-50'):
+        self.model_name = model_name
+        self.word2vec = api.load(model_name)
+        self.dim = self.word2vec.vector_size
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        return np.array([self._get_sentence_vector(sentence) for sentence in X])
+
+    def _get_sentence_vector(self, sentence):
+        words = sentence.split()
+        word_vectors = [self.word2vec[word] for word in words if word in self.word2vec]
+        if len(word_vectors) == 0:
+            return np.zeros(self.dim)
+        return np.mean(word_vectors, axis=0)
+
+# Modify the train_model function
 @cli.command()
 @click.option("--db-password", help="Encryption password of moneymoney DB", required=True)
 @click.option("--date-from", type=RelativeDate(), default="2Y", help="Oldest transaction to use for training (e.g., -1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)
@@ -285,7 +308,7 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
 @click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times", required=True, multiple=True)
 @click.option("--model-name", help="Specify the model name to be created", required=True, default="default", show_default=True)
 @click.option("--limit-to-category-file",type=click.File(), help="Provide a text file with a category ID per line to limit the training to those categories", required=False)
-def train_model(db_password, date_from, date_to, limit_to_account,model_name,limit_to_category_file):
+def train_model(db_password, date_from, date_to, limit_to_account, model_name, limit_to_category_file):
     db = MoneyMoneyDB(db_password)
 
     # Prepare dataframe
@@ -293,15 +316,19 @@ def train_model(db_password, date_from, date_to, limit_to_account,model_name,lim
     df['amount'] = pd.to_numeric(df['amount'], errors='coerce')  
     df['purpose'] = df['purpose'].fillna('no purpose')
     df['name'] = df['name'].fillna('no name')
+    df['type'] = df['type'].fillna('no type')
 
     if limit_to_category_file is not None:
         limit_to_category = [int(line.split()[0]) for line in limit_to_category_file]
         df = df[df['category_key'].isin(limit_to_category)]
 
-    X = df[['amount', 'purpose', 'name','type']]
+    X = df[['amount', 'purpose', 'name', 'type']]
     y = df['category_key']
     tfidf = TfidfVectorizer(max_features=500)
     scaler = StandardScaler()
+
+    # Use Word2Vec for text fields
+    word2vec_vectorizer = Word2VecVectorizer()
 
     # Split into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -310,9 +337,9 @@ def train_model(db_password, date_from, date_to, limit_to_account,model_name,lim
     preprocessor = ColumnTransformer(
         transformers=[
             ('num_amount', scaler, ['amount']),
-            ('text1', tfidf, 'purpose'),
-            ('text2', tfidf, 'name'),
-            ('text3', tfidf, 'type')
+            ('text1', word2vec_vectorizer, 'purpose'),
+            ('text2', word2vec_vectorizer, 'name'),
+            ('text3', word2vec_vectorizer, 'type')
         ]
     )
 
@@ -321,7 +348,7 @@ def train_model(db_password, date_from, date_to, limit_to_account,model_name,lim
         ('classifier', RandomForestClassifier(n_estimators=100, random_state=42))
     ])
 
-    # Train the model
+     # Train the model
     model.fit(X_train, y_train)
 
     # Evaluate the model
@@ -341,7 +368,6 @@ def train_model(db_password, date_from, date_to, limit_to_account,model_name,lim
 
     # Save the model
     joblib.dump(model,str(db.get_data_dir().joinpath(model_name))+".pkl")
-
 
 if __name__ == "__main__":
     cli(obj={})

@@ -10,17 +10,8 @@ So far this is a very early development version - use it on your own risk
 - List accounts in the MoneyMoney database
 - Categorize transactions using a trained machine learning model
 - Apply categorization to the database
-- Support for relative and absolute date inputs
 
-## Requirements
 
-- Python 3.7+
-- Click
-- Pandas
-- PrettyTable
-- Scikit-learn
-- Joblib
-- SQLite3
 
 ## Installation
 
@@ -36,9 +27,9 @@ So far this is a very early development version - use it on your own risk
     source .venv/bin/activate
     ```
 
-3. Install the required packages:
+3. Locally install the package and dependencies:
     ```sh
-    pip install -r requirements.txt
+    pip install -e .
     ```
 
 ## Usage
@@ -48,7 +39,7 @@ So far this is a very early development version - use it on your own risk
 To list all accounts in the MoneyMoney database, use the `list_accounts` command:
 
 ```sh
-python moneymoney-cli.py list_accounts --db-password YOUR_DB_PASSWORD
+python -m moneymoney_cli list_accounts --db-password YOUR_DB_PASSWORD
 ```
 
 ### Categorize Transactions
@@ -56,7 +47,7 @@ python moneymoney-cli.py list_accounts --db-password YOUR_DB_PASSWORD
 To categorize transactions using a trained model, use the `categorize` command:
 
 ```sh
-python moneymoney-cli.py categorize --db-password YOUR_DB_PASSWORD --date-from -3M --date-to 2023-01-01 --limit-to-account ACCOUNT_ID --model-name default.pkl --apply
+python -m moneymoney_cli categorize --db-password YOUR_DB_PASSWORD --date-from -3M --date-to 2023-01-01 --limit-to-account ACCOUNT_ID --model-name default --apply
 ```
 
 - `--db-password`: Encryption password of the MoneyMoney database.
@@ -74,6 +65,7 @@ To train a new model, use the train_model command:
 - `--date-to`: Newest transaction to use for training.
 - `--limit-to-account`: Limit training to transactions in the defined account. Can be provided multiple times.
 - `--model-name`: Specify the model name to be created.
+- `--limit-to-category-file`: Limit the training to category IDs specified in the provided text file. It is recommended to use this option to limit the training to those categories that have enough sample data. The tool expects a category ID each line followed by a whitespace or linebreak. Anything after the whitespace is ignored.
 
 
 ## License

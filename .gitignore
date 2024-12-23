@@ -1,4 +1,9 @@
 .venv*/
 .vscode/launch.json
 *.pyc
-**/__pycache__/** 
+__pycache__/
+.env
+.venv
+build/
+dist/
+moneymoney_cli.egg-info/

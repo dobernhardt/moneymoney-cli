@@ -1,7 +1,4 @@
 import datetime
-import logging
-import pathlib
-from dataclasses import dataclass
 
 from .moneymoneydb import MoneyMoneyDB
 
@@ -36,7 +33,6 @@ class RelativeDate(click.ParamType):
                 return datetime.datetime.strptime(value, "%Y-%m-%d")
         except ValueError:
             self.fail(f"{value} is not a valid date", param, ctx)
-
 
 
 @click.group()

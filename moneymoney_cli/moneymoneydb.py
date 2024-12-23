@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from pysqlcipher3 import dbapi2 as sqlite
 
 
-
-
 class MoneyMoneyDB:
 
     class Exception(Exception):
@@ -131,4 +129,3 @@ class MoneyMoneyDB:
 
         # Return the categories with full names as a dictionary
         return {category_id: category["full_name"] for category_id, category in categories.items()}
-

@@ -21,7 +21,7 @@ dependencies = [
     "numpy",
     "pysqlcipher3",
     "click",
-    "prettytable",
+    "rich",
 ]
 
 [project.optional-dependencies]

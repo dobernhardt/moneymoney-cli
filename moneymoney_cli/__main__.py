@@ -16,6 +16,28 @@ from .relative_date import RelativeDate
 from .word_vec import Word2VecVectorizer
 from rich.console import Console
 from rich.table import Table
+import yaml
+import pathlib
+from .console import console
+
+
+def read_config (profile: str= None):
+    configfile = pathlib.Path(MoneyMoneyDB.get_data_dir().joinpath("moneymoney-cli.config"))
+    if not configfile.exists():
+        configfile = pathlib.Path("moneymoney-cli.config")
+    if not configfile.exists():
+        console.log ("No config file found")
+        return {}
+    console.log (f"Reading config from {configfile.absolute()}")
+    with open(configfile, "r") as file:
+        config = yaml.safe_load(file)
+        if not profile is None:
+            for prof in config.get("profiles", []):
+                if prof.get("profile_name") == profile:
+                    config.update(prof)
+                    break
+        del config["profiles"]
+    return config
 
 
 @click.group()
@@ -24,10 +46,17 @@ def cli():
 
 
 @cli.command()
-@click.option("--db-password", help="Encryption password of moneymoney DB", required=True)
+@click.option("--db-password", help="Encryption password of moneymoney DB")
 def list_accounts(db_password):
-    db = MoneyMoneyDB(db_password)
-    console = Console()
+    config = read_config()
+    db_password = db_password if db_password is not None else config.get("db_password")
+    if None in [db_password]:
+        raise click.UsageError("Please provide all required parameters")
+    try:
+        db = MoneyMoneyDB(db_password)
+    except MoneyMoneyDB.Exception:
+        console.log("Error opening database", style="red")
+        return
     table = Table(title="Accounts")
 
     table.add_column("ID", justify="left", style="cyan", no_wrap=True)
@@ -41,12 +70,13 @@ def list_accounts(db_password):
 
 @cli.command()
 # fmt: off
-@click.option("--db-password", help="Encryption password of moneymoney DB", required=True)
+@click.option("--config-profile",help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)
+@click.option("--db-password", help="Encryption password of moneymoney DB")
 @click.option("--date-from", type=RelativeDate(), default="2Y", help="Oldest transaction to be categorized (e.g., 1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--date-to", type=RelativeDate(), default=(datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d"), help="Newest transaction to be categorized", required=True, show_default=True)  # noqa: E501
 @click.option("--limit-to-account", help="Limit classification to transactions in the defined account. Can be provided multiple times", multiple=True)
 # fmt: on
-def list_category_usage(db_password, date_from, date_to, limit_to_account):
+def list_category_usage(config_profile,db_password, date_from, date_to, limit_to_account):
     """
     List the usage of categories in the transactions.
 
@@ -58,11 +88,18 @@ def list_category_usage(db_password, date_from, date_to, limit_to_account):
 
     This function lists the usage of categories in the transactions within the specified date range and accounts.
     """
-    db = MoneyMoneyDB(db_password)
+    config = read_config(config_profile)
+    db_password = db_password if db_password is not None else config.get("db_password")
+    if None in [db_password]:
+        raise click.UsageError("Please provide all required parameters")
+    try:
+        db = MoneyMoneyDB(db_password)
+    except MoneyMoneyDB.Exception:
+        console.log("Error opening database", style="red")
+        return
     category_usage = db.get_category_usage(date_from, date_to, limit_to_account)
     categories = db.get_categories()
 
-    console = Console()
     table = Table(title="Category Usage")
 
     table.add_column("Category ID", justify="left", style="cyan", no_wrap=True)
@@ -77,37 +114,44 @@ def list_category_usage(db_password, date_from, date_to, limit_to_account):
 
 @cli.command()
 # fmt: off
-@click.option("--db-password", help="Encryption password of moneymoney DB", required=True)
+@click.option("--db-password", help="Encryption password of moneymoney DB")
+@click.option("--config-profile",help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)
 @click.option("--date-from", type=RelativeDate(), default="3M", help="Oldest transaction to be categorized (e.g., 1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--date-to", type=RelativeDate(), default=(datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d"), help="Newest transaction to be categorized", required=True, show_default=True)  # noqa: E501
 @click.option("--limit-to-account", help="Limit classification to transactions in the defined account. Can be provided multiple times", multiple=True)
-@click.option("--model-name", help="Specify the model to be used", required=True, default="default", show_default=True)
+@click.option("--model-name", help="Specify the model to be used",default="default", show_default=True)
 @click.option("--propability-threshold", help="Specify the prediction threshold. Only predictions with a higher propability are conciders", required=True, default=0.75, show_default=True)   # noqa: E501
 @click.option("--apply", help="Apply the categorization to the database", is_flag=True)
 @click.option("--overwrite", help="Categorize also already categorized transactions", is_flag=True)
 # fmt: on
-def categorize(db_password, date_from, date_to, limit_to_account, model_name, apply, propability_threshold, overwrite):
+def categorize(db_password, date_from, date_to, limit_to_account, model_name, apply, propability_threshold, overwrite,config_profile):
     """
     Categorize transactions using a trained machine learning model.
+    Parameters can either be provided as command line arguments or read from a configuration file. If a config.yml file is either found in the current directory
+    or in the MoneyMoney data directory it will be read and configuraiton from the specified profile will be used. Any parameters provided as command line arguments will override the configuration file values.
 
-    Parameters:
-    - db_password: Encryption password of the MoneyMoney database.
-    - date_from: Oldest transaction to be categorized (e.g., 1Y for one year ago or 2021-01-01 for an absolute date).
-    - date_to: Newest transaction to be categorized.
-    - limit_to_account: Limit classification to transactions in the defined account. Can be provided multiple times.
-    - model_name: Specify the model to be used.
-    - apply: Apply the categorization to the database.
-
-    This function loads transactions from the MoneyMoney database, predicts their categories using a trained model,
-    and optionally updates the database with the predicted categories if the --apply flag is specified.
     """
-    db = MoneyMoneyDB(db_password)
+    config = read_config(config_profile)
+    db_password = db_password if db_password is not None else config.get("db_password")
+    limit_to_account = limit_to_account if limit_to_account else config.get("limit_to_account")
+    model_name = model_name if model_name is not None else config.get("model_name")
+    propability_threshold = propability_threshold if propability_threshold is not None else config.get("propability_threshold")
+    date_from = date_from if date_from is not None else config.get("date_from")
+    date_to = date_to if date_to is not None else config.get("date_to")
+    if None in [db_password, model_name, propability_threshold, date_from, date_to]:
+        raise click.UsageError("Please provide all required parameters")
+    try:
+        db = MoneyMoneyDB(db_password)
+    except MoneyMoneyDB.Exception:
+        console.log("Error opening database", style="red")
+        return
+    console.log("Reading transactions from database...")
     transactions = list(db.get_transactions(date_from, date_to, limit_to_account, only_uncategorized=(not overwrite)))
 
     # Create a DataFrame from the transactions
     df = pd.DataFrame([t.__dict__ for t in transactions])
     if df.empty:
-        print("No transactions to categorize.")
+        console.log("No transactions to categorize.",style="red")
         return
 
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
@@ -119,6 +163,7 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     model = joblib.load(str(db.get_data_dir().joinpath(model_name)) + ".pkl")
 
     # Predict categories and probabilities
+    console.log("Predicting categories...")
     predicted_categories = model.predict(X)
     predicted_probabilities = model.predict_proba(X).max(axis=1)
 
@@ -131,7 +176,6 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     df["probability"] = predicted_probabilities
 
     # Print the categorized transactions with probabilities
-    console = Console()
     table = Table(title="Categorized Transactions")
 
     table.add_column("Purpose", justify="left")
@@ -153,35 +197,51 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     console.print(table)
 
     # Apply threshold and update transactions
+    df_filtered = df[df["probability"] >= propability_threshold]
     if apply:
-        df = df[df["probability"] >= propability_threshold]
+        console.log("Applying categorization to database...")
         cursor = db.get_connection().cursor()
-        for transaction_id, predicted_category_id, probabilities in df[["transaction_id", "predicted_category_id", "probability"]].values:
+        for transaction_id, predicted_category_id, probabilities in df_filtered[["transaction_id", "predicted_category_id", "probability"]].values:
             cursor.execute("UPDATE transactions SET category_key = ? WHERE rowid = ?", (int(predicted_category_id), int(transaction_id)))
         db.get_connection().commit()
+    console.log(f"{len(df)} transactions processed.",style="green")
+    console.log(f"{len(df_filtered)} transactions categorized.",style="green")
 
 
 @cli.command()
 # fmt: off
-@click.option("--db-password", help="Encryption password of moneymoney DB", required=True)
+@click.option("--config-profile",help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)
+@click.option("--db-password", help="Encryption password of moneymoney DB")
 @click.option("--date-from", type=RelativeDate(), default="2Y", help="Oldest transaction to use for training (e.g., -1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--date-to", type=RelativeDate(), default=datetime.datetime.now().strftime("%Y-%m-%d"), help="Newest transaction to use for training (e.g., -3M for three months ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
-@click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times", required=True, multiple=True)
+@click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times",multiple=True)
 @click.option("--model-name", help="Specify the model name to be created", required=True, default="default", show_default=True)
-@click.option("--limit-to-category-file", type=click.File(), help="Provide a text file with a category ID per line to limit the training to those categories", required=False)  # noqa: E501
 # fmt: on
-def train_model(db_password, date_from, date_to, limit_to_account, model_name, limit_to_category_file):
-    db = MoneyMoneyDB(db_password)
+def train_model(config_profile,db_password, date_from:datetime.datetime, date_to, limit_to_account, model_name):
+    config = read_config(config_profile)
+    db_password = db_password if db_password is not None else config.get("db_password")
+    limit_to_account = limit_to_account if limit_to_account else config.get("limit_to_account")
+    model_name = model_name if model_name is not None else config.get("model_name")
+    date_from = date_from if date_from is not None else config.get("date_from")
+    date_to = date_to if date_to is not None else config.get("date_to")
+    if None in [db_password, model_name, date_from, date_to]:
+        raise click.UsageError("Please provide all required parameters")
+    try:
+        db = MoneyMoneyDB(db_password)
+    except MoneyMoneyDB.Exception:
+        console.log("Error opening database", style="red")
+        return
 
     # Prepare dataframe
+    console.log(f"Reading transactions from database from {date_from.strftime("%Y-%m-%d")} to {date_to.strftime("%Y-%m-%d")}...")
     df = pd.DataFrame(db.get_transactions(date_from, date_to, limit_to_account))
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
     df["purpose"] = df["purpose"].fillna("no purpose")
     df["name"] = df["name"].fillna("no name")
     df["type"] = df["type"].fillna("no type")
 
-    if limit_to_category_file is not None:
-        limit_to_category = [int(line.split()[0]) for line in limit_to_category_file]
+    if "limit_to_category" in config:
+        limit_to_category = config.get("limit_to_category")
         df = df[df["category_key"].isin(limit_to_category)]
 
     X = df[["amount", "purpose", "name", "type"]]
@@ -207,9 +267,11 @@ def train_model(db_password, date_from, date_to, limit_to_account, model_name, l
     model = Pipeline(steps=[("preprocessor", preprocessor), ("classifier", RandomForestClassifier(n_estimators=100, random_state=42))])
 
     # Train the model
+    console.log("Training model...")
     model.fit(X_train, y_train)
 
     # Evaluate the model
+    console.log("Evaluating model...")
     y_pred = model.predict(X_test)
 
     # Calculate classification report
@@ -220,6 +282,7 @@ def train_model(db_password, date_from, date_to, limit_to_account, model_name, l
     print(classification_report(y_test, y_pred, labels=actual_classes, target_names=actual_class_names))
 
     # Save the model
+    console.log("Saving model...")
     joblib.dump(model, str(db.get_data_dir().joinpath(model_name)) + ".pkl")
 
 

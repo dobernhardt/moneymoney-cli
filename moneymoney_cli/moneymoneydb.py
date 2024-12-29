@@ -20,7 +20,8 @@ class MoneyMoneyDB:
         if not mm_db_path.exists():
             console.log("MoneyMoney database not found!",style="red")
             raise FileNotFoundError("MoneyMoney database not found!")
-        self._connection = sqlite.connect(str(mm_db_path))
+        uri = f"file:{mm_db_path}?mode=ro"
+        self._connection = sqlite.connect(uri, uri=True)
         self._connection.execute(f"PRAGMA key = '{password}';")
         try:
             self._connection.execute("SELECT COUNT(*) FROM sqlite_master;")

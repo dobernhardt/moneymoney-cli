@@ -19,25 +19,7 @@ from rich.table import Table
 import yaml
 import pathlib
 from .console import console
-
-
-def read_config (profile: str= None):
-    configfile = pathlib.Path(MoneyMoneyDB.get_data_dir().joinpath("moneymoney-cli.config"))
-    if not configfile.exists():
-        configfile = pathlib.Path("moneymoney-cli.config")
-    if not configfile.exists():
-        console.log ("No config file found")
-        return {}
-    console.log (f"Reading config from {configfile.absolute()}")
-    with open(configfile, "r") as file:
-        config = yaml.safe_load(file)
-        if not profile is None:
-            for prof in config.get("profiles", []):
-                if prof.get("profile_name") == profile:
-                    config.update(prof)
-                    break
-        del config["profiles"]
-    return config
+from .config import read_config
 
 
 @click.group()
@@ -133,7 +115,7 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     """
     config = read_config(config_profile)
     db_password = db_password if db_password is not None else config.get("db_password")
-    limit_to_account = limit_to_account if limit_to_account else config.get("limit_to_account")
+    limit_to_account = limit_to_account if limit_to_account else config.get("limit_to_accounts")
     model_name = model_name if model_name is not None else config.get("model_name")
     propability_threshold = propability_threshold if propability_threshold is not None else config.get("propability_threshold")
     date_from = date_from if date_from is not None else config.get("date_from")
@@ -216,11 +198,13 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
 @click.option("--date-to", type=RelativeDate(), default=datetime.datetime.now().strftime("%Y-%m-%d"), help="Newest transaction to use for training (e.g., -3M for three months ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times",multiple=True)
 @click.option("--model-name", help="Specify the model name to be created", required=True, default="default", show_default=True)
+@click.option("--evaluate", help="Evaluate the model by splitting the data into training and testset and showing a report", is_flag=True)
+@click.option("--test-set-size", help="Size of the test set in percent", default=0.2, show_default=True)
 # fmt: on
-def train_model(config_profile,db_password, date_from:datetime.datetime, date_to, limit_to_account, model_name):
+def train_model(config_profile,db_password, date_from:datetime.datetime, date_to, limit_to_account, model_name,evaluate, test_set_size):
     config = read_config(config_profile)
     db_password = db_password if db_password is not None else config.get("db_password")
-    limit_to_account = limit_to_account if limit_to_account else config.get("limit_to_account")
+    limit_to_account = limit_to_account if limit_to_account else config.get("limit_to_accounts")
     model_name = model_name if model_name is not None else config.get("model_name")
     date_from = date_from if date_from is not None else config.get("date_from")
     date_to = date_to if date_to is not None else config.get("date_to")
@@ -240,8 +224,8 @@ def train_model(config_profile,db_password, date_from:datetime.datetime, date_to
     df["name"] = df["name"].fillna("no name")
     df["type"] = df["type"].fillna("no type")
 
-    if "limit_to_category" in config:
-        limit_to_category = config.get("limit_to_category")
+    if "limit_to_categories" in config:
+        limit_to_category = config.get("limit_to_categories")
         df = df[df["category_key"].isin(limit_to_category)]
 
     X = df[["amount", "purpose", "name", "type"]]
@@ -252,8 +236,11 @@ def train_model(config_profile,db_password, date_from:datetime.datetime, date_to
     word2vec_vectorizer = Word2VecVectorizer()
 
     # Split into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
+    if evaluate:
+        console.log("Splitting data into training and testing sets...")
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_set_size, random_state=42)
+    else:
+        X_train, y_train = X, y
     # Build the pipeline
     preprocessor = ColumnTransformer(
         transformers=[
@@ -271,19 +258,33 @@ def train_model(config_profile,db_password, date_from:datetime.datetime, date_to
     model.fit(X_train, y_train)
 
     # Evaluate the model
-    console.log("Evaluating model...")
-    y_pred = model.predict(X_test)
+    if evaluate:
+        console.log("Evaluating model...")
+        y_pred = model.predict(X_test)
 
-    # Calculate classification report
-    actual_classes = sorted(set(y_test))
-    categories = db.get_categories()
-    actual_class_names = [categories[cls] for cls in actual_classes]
+        # Calculate classification report
+        actual_classes = sorted(set(y_test))
+        categories = db.get_categories()
+        actual_class_names = [categories[cls] for cls in actual_classes]
 
-    print(classification_report(y_test, y_pred, labels=actual_classes, target_names=actual_class_names))
-
-    # Save the model
-    console.log("Saving model...")
-    joblib.dump(model, str(db.get_data_dir().joinpath(model_name)) + ".pkl")
+        print(classification_report(y_test, y_pred, labels=actual_classes, target_names=actual_class_names))
+        console.log ("Model was not saved. Re-run without --evaluate to save the model",style="yellow")
+    else:
+        # Save the model
+        model_file_name = db.get_data_dir().joinpath(model_name+ ".pkl") 
+        console.log(f"Saving model {model_file_name}")
+        joblib.dump(model, model_file_name)
+        # save model meta data
+        model_meta = {
+            "model_name": model_name,
+            "date_from": date_from,
+            "date_to": date_to,
+            "limit_to_account": limit_to_account,
+            "limit_to_category": limit_to_category,
+            "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        with open(model_file_name.with_suffix(".yml"), "w") as file:
+            yaml.dump(model_meta, file)
 
 
 if __name__ == "__main__":

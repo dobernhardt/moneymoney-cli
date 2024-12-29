@@ -22,7 +22,8 @@ dependencies = [
     "pysqlcipher3",
     "click",
     "rich",
-    "pyyaml,
+    "pyyaml",
+    "schema",
 ]
 
 [project.optional-dependencies]

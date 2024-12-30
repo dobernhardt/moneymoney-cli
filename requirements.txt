@@ -1,7 +1,0 @@
-pandas
-scikit-learn
-numpy
-pysqlcipher3
-click
-coloredlogs
-prettytable

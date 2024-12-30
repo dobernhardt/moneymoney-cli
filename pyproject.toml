@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["black", "flake8", "pytest","Flake8-pyproject"]
+dev = ["black", "flake8", "pytest","Flake8-pyproject", "build"]
 
 [project.scripts]
 moneymoney-cli = "moneymoney_cli:main"

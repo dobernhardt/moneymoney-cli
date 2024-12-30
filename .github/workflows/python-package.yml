@@ -27,6 +27,13 @@ jobs:
     - name: Use GitVersion
       run: dotnet-gitversion /output json /showvariable FullSemVer
       id: gitversion
+    - name: Update version in version.py and pyproject.toml
+      run: |
+        VERSION=${{ steps.gitversion.outputs.FullSemVer }}
+        VERSION=${VERSION//-/.}
+        echo "VERSION=$VERSION"
+        sed -i "s/0.0.0-dev/$VERSION/" moneymoney_cli/version.py
+        sed -i "s/0.0.0-dev/$VERSION/" pyproject.toml
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
@@ -39,12 +46,6 @@ jobs:
       run: |
         echo "CFLAGS=-I/usr/include/sqlcipher" >> $GITHUB_ENV
         echo "LDFLAGS=-L/usr/lib/sqlcipher -lsqlcipher" >> $GITHUB_ENV
-    - name: Update version in version.py and pyproject.toml
-      run: |
-        VERSION=${{ steps.gitversion.outputs.FullSemVer }}
-        VERSION=${VERSION//-/.}
-        sed -i "s/0.0.0-dev/$VERSION/" moneymoney_cli/version.py
-        sed -i "s/0.0.0-dev/$VERSION/" pyproject.toml
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip

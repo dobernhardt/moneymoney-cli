@@ -18,9 +18,11 @@ from rich.table import Table
 import yaml
 from .console import console
 from .config import read_config
+from .version import __version__
 
 
 @click.group()
+@click.version_option(__version__, prog_name="MoneyMoney CLI")
 def cli():
     pass
 

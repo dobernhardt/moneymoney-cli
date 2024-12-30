@@ -25,14 +25,16 @@ jobs:
     - name: Install GitVersion
       run: dotnet tool install -g GitVersion.Tool
     - name: Use GitVersion
-      run: dotnet-gitversion /output json /showvariable FullSemVer
       id: gitversion
+      run: echo "::set-output name=FullSemVer::$(dotnet-gitversion /output json /showvariable FullSemVer)"
     - name: Update version in version.py and pyproject.toml
       run: |
         VERSION=${{ steps.gitversion.outputs.FullSemVer }}
+        echo "VERSION=$VERSION"
         VERSION=${VERSION//-/+}
         echo "VERSION=$VERSION"
         sed -i "s/0.0.0-dev/$VERSION/" moneymoney_cli/version.py
+        cat moneymoney_cli/version.py
         sed -i "s/0.0.0-dev/$VERSION/" pyproject.toml
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3

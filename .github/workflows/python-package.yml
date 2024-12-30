@@ -20,6 +20,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install GitVersion
+      run: dotnet tool install -g GitVersion.Tool
+    - name: Use GitVersion
+      run: gitversion /output json /showvariable FullSemVer
+      id: gitversion
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:

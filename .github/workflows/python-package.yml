@@ -30,7 +30,7 @@ jobs:
     - name: Update version in version.py and pyproject.toml
       run: |
         VERSION=${{ steps.gitversion.outputs.FullSemVer }}
-        VERSION=${VERSION//-/.}
+        VERSION=${VERSION//-/+}
         echo "VERSION=$VERSION"
         sed -i "s/0.0.0-dev/$VERSION/" moneymoney_cli/version.py
         sed -i "s/0.0.0-dev/$VERSION/" pyproject.toml

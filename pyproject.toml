@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moneymoney-cli"
-version = "0.1.0"
+version = "0.0.0-dev"
 description = "A CLI for interacting with MoneyMoney and categorize transactions with Machinelearning models"
 readme = "README.md"
 authors = [{ name = "Dominik Bernhardt", email = "dominik@dokabe.de" }]
@@ -21,11 +21,13 @@ dependencies = [
     "numpy",
     "pysqlcipher3",
     "click",
-    "prettytable",
+    "rich",
+    "pyyaml",
+    "schema",
 ]
 
 [project.optional-dependencies]
-dev = ["black", "flake8", "pytest"]
+dev = ["black", "flake8", "pytest","Flake8-pyproject", "build"]
 
 [project.scripts]
 moneymoney-cli = "moneymoney_cli:main"

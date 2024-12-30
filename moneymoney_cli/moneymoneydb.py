@@ -1,8 +1,8 @@
 import datetime
-import logging
 import pathlib
 from dataclasses import dataclass
 from pysqlcipher3 import dbapi2 as sqlite
+from .console import console
 
 
 class MoneyMoneyDB:
@@ -10,29 +10,28 @@ class MoneyMoneyDB:
     class Exception(Exception):
         ...
 
-    class InvalidKey(Exception):
-        ...
+    @staticmethod
+    def get_data_dir() -> pathlib.Path:
+        return pathlib.Path.home().joinpath("Library/Containers/com.moneymoney-app.retail/Data/Library/Application Support/MoneyMoney/Database").absolute()
 
     def __init__(self, password: str):
-        self._logger = logging.getLogger("MoneyMoneyDB")
-        self._mm_data_dir = (
-            pathlib.Path.home().joinpath("Library/Containers/com.moneymoney-app.retail/Data/Library/Application Support/MoneyMoney/Database").absolute()
-        )
-        mm_db_path = self._mm_data_dir.joinpath("MoneyMoney.sqlite")
+        mm_db_path = MoneyMoneyDB.get_data_dir().joinpath("MoneyMoney.sqlite")
+        console.log("opening MoneyMoney database at", mm_db_path, style="dim")
         if not mm_db_path.exists():
-            self._logger.error("MoneyMoney database not found!")
+            console.log("MoneyMoney database not found!", style="red")
             raise FileNotFoundError("MoneyMoney database not found!")
-        self._connection = sqlite.connect(str(mm_db_path))
+        uri = f"file:{mm_db_path}?mode=ro"
+        self._connection = sqlite.connect(uri, uri=True)
         self._connection.execute(f"PRAGMA key = '{password}';")
         try:
             self._connection.execute("SELECT COUNT(*) FROM sqlite_master;")
-            self._logger.debug("Key is valid, database unlocked!")
+            console.log("Key is valid, database unlocked!", style="green")
+        except sqlite.OperationalError as e:
+            console.log(f"Database error: {e}. Propably database is open in MoneyMoney", style="red")
+            raise MoneyMoneyDB.Exception()
         except sqlite.DatabaseError as e:
-            self._logger.error(f"Invalid key, database is not encrypted or it is not a valid DB file: {e}")
-            raise MoneyMoneyDB.InvalidKey()
-
-    def get_data_dir(self) -> pathlib.Path:
-        return self._mm_data_dir
+            console.log(f"Database error {e}. Invalid key, database is not encrypted or it is not a valid DB file", style="red")
+            raise MoneyMoneyDB.Exception()
 
     def get_accounts(self):
         cursor = self._connection.cursor()

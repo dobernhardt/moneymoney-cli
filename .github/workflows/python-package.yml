@@ -20,6 +20,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     - name: Install GitVersion
       run: dotnet tool install -g GitVersion.Tool
     - name: Use GitVersion

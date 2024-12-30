@@ -14,10 +14,8 @@ from sklearn.preprocessing import StandardScaler
 from .moneymoneydb import MoneyMoneyDB
 from .relative_date import RelativeDate
 from .word_vec import Word2VecVectorizer
-from rich.console import Console
 from rich.table import Table
 import yaml
-import pathlib
 from .console import console
 from .config import read_config
 
@@ -52,13 +50,13 @@ def list_accounts(db_password):
 
 @cli.command()
 # fmt: off
-@click.option("--config-profile",help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)
+@click.option("--config-profile", help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)  # noqa: E501
 @click.option("--db-password", help="Encryption password of moneymoney DB")
 @click.option("--date-from", type=RelativeDate(), default="2Y", help="Oldest transaction to be categorized (e.g., 1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--date-to", type=RelativeDate(), default=(datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d"), help="Newest transaction to be categorized", required=True, show_default=True)  # noqa: E501
 @click.option("--limit-to-account", help="Limit classification to transactions in the defined account. Can be provided multiple times", multiple=True)
 # fmt: on
-def list_category_usage(config_profile,db_password, date_from, date_to, limit_to_account):
+def list_category_usage(config_profile, db_password, date_from, date_to, limit_to_account):
     """
     List the usage of categories in the transactions.
 
@@ -97,20 +95,21 @@ def list_category_usage(config_profile,db_password, date_from, date_to, limit_to
 @cli.command()
 # fmt: off
 @click.option("--db-password", help="Encryption password of moneymoney DB")
-@click.option("--config-profile",help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)
+@click.option("--config-profile", help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)  # noqa: E501
 @click.option("--date-from", type=RelativeDate(), default="3M", help="Oldest transaction to be categorized (e.g., 1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--date-to", type=RelativeDate(), default=(datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d"), help="Newest transaction to be categorized", required=True, show_default=True)  # noqa: E501
 @click.option("--limit-to-account", help="Limit classification to transactions in the defined account. Can be provided multiple times", multiple=True)
-@click.option("--model-name", help="Specify the model to be used",default="default", show_default=True)
+@click.option("--model-name", help="Specify the model to be used", default="default", show_default=True)
 @click.option("--propability-threshold", help="Specify the prediction threshold. Only predictions with a higher propability are conciders", required=True, default=0.75, show_default=True)   # noqa: E501
 @click.option("--apply", help="Apply the categorization to the database", is_flag=True)
 @click.option("--overwrite", help="Categorize also already categorized transactions", is_flag=True)
 # fmt: on
-def categorize(db_password, date_from, date_to, limit_to_account, model_name, apply, propability_threshold, overwrite,config_profile):
+def categorize(db_password, date_from, date_to, limit_to_account, model_name, apply, propability_threshold, overwrite, config_profile):
     """
     Categorize transactions using a trained machine learning model.
     Parameters can either be provided as command line arguments or read from a configuration file. If a config.yml file is either found in the current directory
-    or in the MoneyMoney data directory it will be read and configuraiton from the specified profile will be used. Any parameters provided as command line arguments will override the configuration file values.
+    or in the MoneyMoney data directory it will be read and configuraiton from the specified profile will be used.
+    Any parameters provided as command line arguments will override the configuration file values.
 
     """
     config = read_config(config_profile)
@@ -133,7 +132,7 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     # Create a DataFrame from the transactions
     df = pd.DataFrame([t.__dict__ for t in transactions])
     if df.empty:
-        console.log("No transactions to categorize.",style="red")
+        console.log("No transactions to categorize.", style="red")
         return
 
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
@@ -169,12 +168,7 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
     for _, row in df.iterrows():
         probability_style = "bright_black" if row["probability"] < propability_threshold else "white"
         table.add_row(
-            row["purpose"][:50],
-            row["name"][:50],
-            f"{row['amount']:.2f}",
-            row["predicted_category"],
-            f"{row['probability']:.2f}",
-            style=probability_style
+            row["purpose"][:50], row["name"][:50], f"{row['amount']:.2f}", row["predicted_category"], f"{row['probability']:.2f}", style=probability_style
         )
     console.print(table)
 
@@ -186,22 +180,22 @@ def categorize(db_password, date_from, date_to, limit_to_account, model_name, ap
         for transaction_id, predicted_category_id, probabilities in df_filtered[["transaction_id", "predicted_category_id", "probability"]].values:
             cursor.execute("UPDATE transactions SET category_key = ? WHERE rowid = ?", (int(predicted_category_id), int(transaction_id)))
         db.get_connection().commit()
-    console.log(f"{len(df)} transactions processed.",style="green")
-    console.log(f"{len(df_filtered)} transactions categorized.",style="green")
+    console.log(f"{len(df)} transactions processed.", style="green")
+    console.log(f"{len(df_filtered)} transactions categorized.", style="green")
 
 
 @cli.command()
 # fmt: off
-@click.option("--config-profile",help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)
+@click.option("--config-profile", help="Configuration profile to use to read config values from instead of specifying on the command line", default="default", show_default=True, required=False)  # noqa: E501
 @click.option("--db-password", help="Encryption password of moneymoney DB")
 @click.option("--date-from", type=RelativeDate(), default="2Y", help="Oldest transaction to use for training (e.g., -1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--date-to", type=RelativeDate(), default=datetime.datetime.now().strftime("%Y-%m-%d"), help="Newest transaction to use for training (e.g., -3M for three months ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
-@click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times",multiple=True)
+@click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times", multiple=True)
 @click.option("--model-name", help="Specify the model name to be created", required=True, default="default", show_default=True)
 @click.option("--evaluate", help="Evaluate the model by splitting the data into training and testset and showing a report", is_flag=True)
 @click.option("--test-set-size", help="Size of the test set in percent", default=0.2, show_default=True)
 # fmt: on
-def train_model(config_profile,db_password, date_from:datetime.datetime, date_to, limit_to_account, model_name,evaluate, test_set_size):
+def train_model(config_profile, db_password, date_from: datetime.datetime, date_to, limit_to_account, model_name, evaluate, test_set_size):
     config = read_config(config_profile)
     db_password = db_password if db_password is not None else config.get("db_password")
     limit_to_account = limit_to_account if limit_to_account else config.get("limit_to_accounts")
@@ -268,10 +262,10 @@ def train_model(config_profile,db_password, date_from:datetime.datetime, date_to
         actual_class_names = [categories[cls] for cls in actual_classes]
 
         print(classification_report(y_test, y_pred, labels=actual_classes, target_names=actual_class_names))
-        console.log ("Model was not saved. Re-run without --evaluate to save the model",style="yellow")
+        console.log("Model was not saved. Re-run without --evaluate to save the model", style="yellow")
     else:
         # Save the model
-        model_file_name = db.get_data_dir().joinpath(model_name+ ".pkl") 
+        model_file_name = db.get_data_dir().joinpath(model_name + ".pkl")
         console.log(f"Saving model {model_file_name}")
         joblib.dump(model, model_file_name)
         # save model meta data

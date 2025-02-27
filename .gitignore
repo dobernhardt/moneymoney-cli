@@ -8,3 +8,4 @@ build/
 dist/
 moneymoney_cli.egg-info/
 moneymoney-cli.config
+.pyenv/

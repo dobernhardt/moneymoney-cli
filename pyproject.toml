@@ -19,11 +19,12 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "numpy",
-    "pysqlcipher3",
     "click",
     "rich",
     "pyyaml",
     "schema",
+    "gensim",
+    "getch",
 ]
 
 [project.optional-dependencies]

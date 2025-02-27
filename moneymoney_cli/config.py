@@ -1,22 +1,19 @@
 import yaml
 import pathlib
 from .console import console
-from .moneymoneydb import MoneyMoneyDB
 from schema import Optional, Schema, SchemaError
 
 
 config_schema = Schema(
     {
-        "db_password": str,
         "profiles": [
             {
                 "profile_name": str,
                 Optional("model_name"): str,
-                Optional("propability_threshold"): float,
                 Optional("date_from"): str,
                 Optional("date_to"): str,
-                Optional("limit_to_accounts"): [int],
-                Optional("limit_to_categories"): [int],
+                Optional("limit_to_accounts"): [str],
+                Optional("limit_to_categories"): [str],
             }
         ],
     }

@@ -18,8 +18,8 @@ class MoneyMoney:
             version = output.decode().strip()
             console.log(f"MoneyMoney is running version {version}", style="green")
             self._default_category = self.get_default_category()
-            self._categorynames = {category['uuid']: category['name'] for category in self.get_categories()}
-            self._accountnames = {account['uuid']: account['name'] for account in self.get_accounts()}
+            self._categorynames = {category["uuid"]: category["name"] for category in self.get_categories()}
+            self._accountnames = {account["uuid"]: account["name"] for account in self.get_accounts()}
         except MoneyMoney.Exception as e:
             console.log("Unable to access MoneyMoney", style="red")
             console.log(e, style="red")
@@ -40,11 +40,11 @@ class MoneyMoney:
         tell application "MoneyMoney"
             {script}
         end tell"""
-        command = ['osascript', '-e', script]
+        command = ["osascript", "-e", script]
         with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as pipe:
             result = pipe.communicate()
             if result[1] or pipe.returncode != 0:
-                raise MoneyMoney.Exception('Failed to execute MoneyMoney command. %s' % result[1].decode().strip())
+                raise MoneyMoney.Exception("Failed to execute MoneyMoney command. %s" % result[1].decode().strip())
         return result[0]
 
     def get_default_category(self):
@@ -53,11 +53,11 @@ class MoneyMoney:
         # Parse the plist
         categories_plist = plistlib.loads(plist_output)
         for category in categories_plist:
-            if category['default']:
-                return {'uuid': category['uuid'], 'name': category['name']}
+            if category["default"]:
+                return {"uuid": category["uuid"], "name": category["name"]}
 
     def categorize_transaction(self, transaction_id, category_uuid):
-        script = f"set transaction id {transaction_id} category to \"{category_uuid}\""
+        script = f'set transaction id {transaction_id} category to "{category_uuid}"'
         self.run_script(script)
 
     def get_categories(self):
@@ -69,18 +69,18 @@ class MoneyMoney:
         stack = []
         for category in categories_plist:
             # Maintain stack structure
-            while stack and stack[-1][1] >= category['indentation']:
+            while stack and stack[-1][1] >= category["indentation"]:
                 stack.pop()
             # Append the current element
             if stack:
                 full_name = f"{'/'.join(x[0] for x in stack)}/{category['name']}"
             else:
-                full_name = category['name']
+                full_name = category["name"]
             # Push to stack
-            stack.append((category['name'], category['indentation']))
+            stack.append((category["name"], category["indentation"]))
             # Store if it's a leaf
-            if not category['group']:
-                yield {'uuid': category['uuid'], 'name': full_name}
+            if not category["group"]:
+                yield {"uuid": category["uuid"], "name": full_name}
 
     def get_category_usage(self, date_from, date_to, limit_to_accounts=None):
         transactions = self.get_transactions(date_from, date_to, limit_to_accounts)
@@ -99,18 +99,18 @@ class MoneyMoney:
         stack = []
         for account in accounts_plist:
             # Maintain stack structure
-            while stack and stack[-1][1] >= account['indentation']:
+            while stack and stack[-1][1] >= account["indentation"]:
                 stack.pop()
             # Append the current element
             if stack:
                 full_name = f"{'/'.join(x[0] for x in stack)}/{account['name']}"
             else:
-                full_name = account['name']
+                full_name = account["name"]
             # Push to stack
-            stack.append((account['name'], account['indentation']))
+            stack.append((account["name"], account["indentation"]))
             # Store if it's a leaf
-            if not account['group']:
-                yield {'uuid': account['uuid'], 'name': full_name}
+            if not account["group"]:
+                yield {"uuid": account["uuid"], "name": full_name}
 
     @dataclass
     class Transaction:
@@ -127,17 +127,17 @@ class MoneyMoney:
         script_output = self.run_script(script)
         # Convert the string output to bytes
         transactions_plist = plistlib.loads(script_output)
-        for transaction in transactions_plist['transactions']:
-            if limit_to_accounts and transaction['accountUuid'] not in limit_to_accounts:
+        for transaction in transactions_plist["transactions"]:
+            if limit_to_accounts and transaction["accountUuid"] not in limit_to_accounts:
                 continue
-            if only_uncategorized and transaction['categoryUuid'] != self._default_category["uuid"]:
+            if only_uncategorized and transaction["categoryUuid"] != self._default_category["uuid"]:
                 continue
             yield MoneyMoney.Transaction(
-                transaction_id=transaction['id'],
-                account_uid=transaction['accountUuid'],
-                amount=transaction['amount'],
-                purpose=transaction.get('purpose', ''),
-                name=transaction['name'],
-                category_uid=transaction['categoryUuid'],
-                timestamp=transaction['bookingDate'].timestamp()
+                transaction_id=transaction["id"],
+                account_uid=transaction["accountUuid"],
+                amount=transaction["amount"],
+                purpose=transaction.get("purpose", ""),
+                name=transaction["name"],
+                category_uid=transaction["categoryUuid"],
+                timestamp=transaction["bookingDate"].timestamp(),
             )

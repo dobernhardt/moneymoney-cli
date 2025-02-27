@@ -38,7 +38,7 @@ def list_accounts():
     table.add_column("Account name", justify="left", style="magenta")
 
     for account in mm.get_accounts():
-        table.add_row(account['uuid'], account['name'])
+        table.add_row(account["uuid"], account["name"])
 
     console.print(table)
 
@@ -52,7 +52,7 @@ def list_categories():
     table.add_column("Account name", justify="left", style="magenta")
 
     for account in mm.get_categories():
-        table.add_row(account['uuid'], account['name'])
+        table.add_row(account["uuid"], account["name"])
 
     console.print(table)
 
@@ -112,7 +112,8 @@ def categorize(date_from, date_to, limit_to_account, model_name, overwrite, conf
     Parameters can either be provided as command line arguments or read from a configuration file. If a config.yml file is either found in the current directory
     or in the MoneyMoney data directory it will be read and configuraiton from the specified profile will be used.
     Any parameters provided as command line arguments will override the configuration file values.
-    All transactions withing the specified date range and accounts will be categorized using the specified model. The categorization can interactively be applied to MoneyMoney.
+    All transactions withing the specified date range and accounts will be categorized using the specified model.
+    The categorization can interactively be applied to MoneyMoney.
 
     """
     config = read_config(config_profile)
@@ -181,19 +182,21 @@ def categorize(date_from, date_to, limit_to_account, model_name, overwrite, conf
             probability = row["top_3_probabilities"][0]
             category = row["top_3_categories"][0]
             probability_style = "bright_black" if probability < probability_threshold else "white"
-            row = table.add_row(datetime.datetime.fromtimestamp(row['timestamp']).strftime('%Y-%m-%d'), row['purpose'], row['name'], f"{row['amount']:.2f}", category, f"{probability:.2f}", style=probability_style)
+            row = table.add_row(
+                datetime.datetime.fromtimestamp(row["timestamp"]).strftime("%Y-%m-%d"),
+                row["purpose"],
+                row["name"],
+                f"{row['amount']:.2f}",
+                category,
+                f"{probability:.2f}",
+                style=probability_style,
+            )
         console.print(table)
         return
     console.log("List/Apply categorization to MoneyMoney")
     console.log("Press 1, 2, 3 to select category or ESC to break or Enter to skip")
     # Define column widths as percentages
-    column_widths = {
-        "Date": 10,
-        "Purpose": 20,
-        "Name": 20,
-        "Amount": 10,
-        "Probable Categories": 40
-    }
+    column_widths = {"Date": 10, "Purpose": 20, "Name": 20, "Amount": 10, "Probable Categories": 40}
     terminal_width = shutil.get_terminal_size().columns
 
     # Calculate column widths in characters
@@ -212,20 +215,31 @@ def categorize(date_from, date_to, limit_to_account, model_name, overwrite, conf
         table.add_column("Name", justify="left", style="yellow", width=column_widths_chars["Name"])
         table.add_column("Amount", justify="right", style="green", width=column_widths_chars["Amount"])
         table.add_column("Probable Categories", justify="left", style="blue", width=column_widths_chars["Probable Categories"])
-        table.add_row(datetime.datetime.fromtimestamp(row['timestamp']).strftime('%Y-%m-%d'), row['purpose'], row['name'], f"{row['amount']:.2f}", "\n".join([f"{i+1}. {category} (Probability: {probability:.2f})" for i, (category, probability) in enumerate(zip(row["top_3_categories"], row["top_3_probabilities"]))]))
+        table.add_row(
+            datetime.datetime.fromtimestamp(row["timestamp"]).strftime("%Y-%m-%d"),
+            row["purpose"],
+            row["name"],
+            f"{row['amount']:.2f}",
+            "\n".join(
+                [
+                    f"{i+1}. {category} (Probability: {probability:.2f})"
+                    for i, (category, probability) in enumerate(zip(row["top_3_categories"], row["top_3_probabilities"]))
+                ]
+            ),
+        )
         console.print(table)
         if auto_apply and row["top_3_probabilities"][0] > probability_threshold:
             console.log("Transaction automatically categorized as: ", row["top_3_categories"][0], style="green")
             selected_category = row["top_3_category_uuids"][0]
         else:
             choice = getch.getch()
-            while choice not in ["1", "2", "3", '\x1b', '\n']:
+            while choice not in ["1", "2", "3", "\x1b", "\n"]:
                 console.print("Invalid choice. Select category (1, 2, 3) or ESC for break or Enter for skip: ")
                 choice = getch.getch()
-            if choice == '\x1b':
+            if choice == "\x1b":
                 num_skipped += 1
                 break
-            if choice == '\n':
+            if choice == "\n":
                 console.log("Skipping transaction", style="yellow")
                 num_skipped += 1
                 continue
@@ -364,11 +378,11 @@ def list_transactions(config_profile, date_from, date_to, limit_to_account):
 
     for transaction in mm.get_transactions(date_from, date_to, limit_to_account):
         table.add_row(
-            datetime.datetime.fromtimestamp(transaction.timestamp).strftime('%Y-%m-%d'),
+            datetime.datetime.fromtimestamp(transaction.timestamp).strftime("%Y-%m-%d"),
             f"{transaction.amount:.2f}",
             transaction.purpose,
             transaction.name,
-            mm.get_category_name(transaction.category_uid)
+            mm.get_category_name(transaction.category_uid),
         )
 
     console.print(table)

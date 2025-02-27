@@ -1,16 +1,18 @@
 
 # MoneyMoney CLI Tool
 
-MoneyMoney CLI Tool is a command-line tool for listing and manipulating the MoneyMoney database. The main feature is probably categorizing transactions in the MoneyMoney application using machine learning models.
+MoneyMoney CLI Tool is a command-line tool for listing and manipulating MoneyMoney data by using the AppleScript API. The main feature is probably categorizing transactions in the MoneyMoney application using machine learning models.
 
 So far this is a very early development version - use it on your own risk
 
 ## Features
 
 - List accounts in the MoneyMoney database
+- List category usage - i.e. sort categories by the numer of transactions they are used for
 - Categorize transactions using a trained machine learning model
 - Apply categorization to the database
 
+Most configuraiton parameters can also be provided in a config file instead of the commandline
 
 
 ## Installation
@@ -32,40 +34,6 @@ So far this is a very early development version - use it on your own risk
     pip install -e .
     ```
 
-## Usage
-
-### List Accounts
-
-To list all accounts in the MoneyMoney database, use the `list_accounts` command:
-
-```sh
-python -m moneymoney_cli list_accounts --db-password YOUR_DB_PASSWORD
-```
-
-### Categorize Transactions
-
-To categorize transactions using a trained model, use the `categorize` command:
-
-```sh
-python -m moneymoney_cli categorize --db-password YOUR_DB_PASSWORD --date-from -3M --date-to 2023-01-01 --limit-to-account ACCOUNT_ID --model-name default --apply
-```
-
-- `--db-password`: Encryption password of the MoneyMoney database.
-- `--date-from`: Oldest transaction to be categorized (e.g., `-1Y` for one year ago or `2021-01-01` for an absolute date).
-- `--date-to`: Newest transaction to be categorized.
-- `--limit-to-account`: Limit classification to transactions in the defined account. Can be provided multiple times.
-- `--model-name`: Specify the model to be used.
-- `--apply`: Apply the categorization to the database.
-
-### Train Model
-To train a new model, use the train_model command:
-
-- `--db-password`: Encryption password of the MoneyMoney database.
-- `--date-from`: Oldest transaction to use for training (e.g., -1Y for one year ago or 2021-01-01 for an absolute date).
-- `--date-to`: Newest transaction to use for training.
-- `--limit-to-account`: Limit training to transactions in the defined account. Can be provided multiple times.
-- `--model-name`: Specify the model name to be created.
-- `--limit-to-category-file`: Limit the training to category IDs specified in the provided text file. It is recommended to use this option to limit the training to those categories that have enough sample data. The tool expects a category ID each line followed by a whitespace or linebreak. Anything after the whitespace is ignored.
 
 
 ## License

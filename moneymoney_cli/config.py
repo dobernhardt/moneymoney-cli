@@ -1,22 +1,20 @@
 import yaml
 import pathlib
 from .console import console
-from .moneymoneydb import MoneyMoneyDB
 from schema import Optional, Schema, SchemaError
+from .moneymoney import MoneyMoney
 
 
 config_schema = Schema(
     {
-        "db_password": str,
         "profiles": [
             {
                 "profile_name": str,
                 Optional("model_name"): str,
-                Optional("propability_threshold"): float,
                 Optional("date_from"): str,
                 Optional("date_to"): str,
-                Optional("limit_to_accounts"): [int],
-                Optional("limit_to_categories"): [int],
+                Optional("limit_to_accounts"): [str],
+                Optional("limit_to_categories"): [str],
             }
         ],
     }
@@ -24,7 +22,7 @@ config_schema = Schema(
 
 
 def read_config(profile: str = None):
-    configfile = pathlib.Path(MoneyMoneyDB.get_data_dir().joinpath("moneymoney-cli.config"))
+    configfile = pathlib.Path(MoneyMoney.get_data_dir().joinpath("moneymoney-cli.config"))
     if not configfile.exists():
         configfile = pathlib.Path("moneymoney-cli.config")
     if not configfile.exists():

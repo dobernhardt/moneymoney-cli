@@ -22,13 +22,12 @@ class MoneyMoney:
             self._accountnames = {account['uuid']: account['name'] for account in self.get_accounts()}
         except MoneyMoney.Exception as e:
             console.log("Unable to access MoneyMoney", style="red")
-            console.log (e, style="red")
+            console.log(e, style="red")
             sys.exit(1)
 
     @staticmethod
     def get_data_dir() -> pathlib.Path:
         return pathlib.Path.home().joinpath("Library/Containers/com.moneymoney-app.retail/Data/Library/Application Support/MoneyMoney/Database").absolute()
-
 
     def get_account_name(self, account_uuid):
         return self._accountnames[account_uuid]
@@ -47,7 +46,6 @@ class MoneyMoney:
             if result[1] or pipe.returncode != 0:
                 raise MoneyMoney.Exception('Failed to execute MoneyMoney command. %s' % result[1].decode().strip())
         return result[0]
-                
 
     def get_default_category(self):
         script = "export categories"
@@ -57,7 +55,6 @@ class MoneyMoney:
         for category in categories_plist:
             if category['default']:
                 return {'uuid': category['uuid'], 'name': category['name']}
-            
 
     def categorize_transaction(self, transaction_id, category_uuid):
         script = f"set transaction id {transaction_id} category to \"{category_uuid}\""
@@ -95,7 +92,6 @@ class MoneyMoney:
             category_usage[category] += 1
         return category_usage
 
-
     def get_accounts(self):
         script = "export accounts"
         plist_output = self.run_script(script)
@@ -115,10 +111,7 @@ class MoneyMoney:
             # Store if it's a leaf
             if not account['group']:
                 yield {'uuid': account['uuid'], 'name': full_name}
-                
-            
 
-    
     @dataclass
     class Transaction:
         transaction_id: int
@@ -128,7 +121,6 @@ class MoneyMoney:
         name: str
         category_uid: str
         timestamp: int
-    
 
     def get_transactions(self, date_from, date_to, limit_to_accounts=None, only_uncategorized=False):
         script = f'export transactions from date "{date_from.strftime("%Y-%m-%d")}" to date "{date_to.strftime("%Y-%m-%d")}" as "plist"'
@@ -149,5 +141,3 @@ class MoneyMoney:
                 category_uid=transaction['categoryUuid'],
                 timestamp=transaction['bookingDate'].timestamp()
             )
-
-

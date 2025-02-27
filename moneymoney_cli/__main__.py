@@ -31,7 +31,6 @@ def cli():
 
 @cli.command()
 def list_accounts():
-    config = read_config()
     mm = MoneyMoney()
     table = Table(title="Accounts")
 
@@ -39,14 +38,13 @@ def list_accounts():
     table.add_column("Account name", justify="left", style="magenta")
 
     for account in mm.get_accounts():
-        table.add_row(account['uuid'],account['name'])
+        table.add_row(account['uuid'], account['name'])
 
     console.print(table)
 
 
 @cli.command()
 def list_categories():
-    config = read_config()
     mm = MoneyMoney()
     table = Table(title="Categories")
 
@@ -54,7 +52,7 @@ def list_categories():
     table.add_column("Account name", justify="left", style="magenta")
 
     for account in mm.get_categories():
-        table.add_row(account['uuid'],account['name'])
+        table.add_row(account['uuid'], account['name'])
 
     console.print(table)
 
@@ -105,10 +103,10 @@ def list_category_usage(config_profile, date_from, date_to, limit_to_account):
 @click.option("--model-name", help="Specify the model to be used", default="default", show_default=True)
 @click.option("--overwrite", help="Categorize also already categorized transactions", is_flag=True)
 @click.option("--list-only", help="List only the transactions how the would be categorized. Does not alter MoneyMoney", is_flag=True)
-@click.option("--probability-threshold", help="Probability threshold to auto apply the category without asking for user input",default=0.9, show_default=True)
+@click.option("--probability-threshold", help="Probability threshold to auto apply the category without asking for user input", default=0.9, show_default=True)
 @click.option("--auto-apply", help="Autoapply if propability>propability threshold without user input", is_flag=True)
 # fmt: on
-def categorize(date_from, date_to, limit_to_account, model_name,overwrite, config_profile, list_only, probability_threshold,auto_apply):
+def categorize(date_from, date_to, limit_to_account, model_name, overwrite, config_profile, list_only, probability_threshold, auto_apply):
     """
     Categorize transactions using a trained machine learning model.
     Parameters can either be provided as command line arguments or read from a configuration file. If a config.yml file is either found in the current directory
@@ -131,7 +129,7 @@ def categorize(date_from, date_to, limit_to_account, model_name,overwrite, confi
     if df.empty:
         console.log("No transactions to categorize.", style="red")
         return
-    
+
     # Calculate the number of transactions
     num_transactions = len(transactions)
 
@@ -183,11 +181,11 @@ def categorize(date_from, date_to, limit_to_account, model_name,overwrite, confi
             probability = row["top_3_probabilities"][0]
             category = row["top_3_categories"][0]
             probability_style = "bright_black" if probability < probability_threshold else "white"
-            row = table.add_row(datetime.datetime.fromtimestamp(row['timestamp']).strftime('%Y-%m-%d'), row['purpose'], row['name'], f"{row['amount']:.2f}", category, f"{probability:.2f}",style=probability_style)
+            row = table.add_row(datetime.datetime.fromtimestamp(row['timestamp']).strftime('%Y-%m-%d'), row['purpose'], row['name'], f"{row['amount']:.2f}", category, f"{probability:.2f}", style=probability_style)
         console.print(table)
         return
-    console.log ("List/Apply categorization to MoneyMoney")
-    console.log ("Press 1, 2, 3 to select category or ESC to break or Enter to skip")
+    console.log("List/Apply categorization to MoneyMoney")
+    console.log("Press 1, 2, 3 to select category or ESC to break or Enter to skip")
     # Define column widths as percentages
     column_widths = {
         "Date": 10,
@@ -206,7 +204,7 @@ def categorize(date_from, date_to, limit_to_account, model_name,overwrite, confi
     num_skipped = 0
     for _, row in df.iterrows():
         console.print("\n\n")
-        console.print (f"Transaction {transaction_id + 1} of {num_transactions}", style="green")
+        console.print(f"Transaction {transaction_id + 1} of {num_transactions}", style="green")
         transaction_id += 1
         table = Table()
         table.add_column("Date", justify="left", style="cyan", no_wrap=True, width=column_widths_chars["Date"])
@@ -221,7 +219,7 @@ def categorize(date_from, date_to, limit_to_account, model_name,overwrite, confi
             selected_category = row["top_3_category_uuids"][0]
         else:
             choice = getch.getch()
-            while choice not in ["1", "2", "3",'\x1b','\n']:
+            while choice not in ["1", "2", "3", '\x1b', '\n']:
                 console.print("Invalid choice. Select category (1, 2, 3) or ESC for break or Enter for skip: ")
                 choice = getch.getch()
             if choice == '\x1b':
@@ -235,11 +233,10 @@ def categorize(date_from, date_to, limit_to_account, model_name,overwrite, confi
             selected_category = row["top_3_category_uuids"][int(choice) - 1]
         num_categorized += 1
         mm.categorize_transaction(row["transaction_id"], selected_category)
-    
+
     console.log(f"{transaction_id} transactions processed.", style="green")
     console.log(f"{num_categorized} transactions categorized.", style="green")
     console.log(f"{num_skipped} transactions skipped.", style="green")
-
 
 
 @cli.command()
@@ -261,7 +258,7 @@ def train_model(config_profile, date_from: datetime.datetime, date_to, limit_to_
     if None in [model_name, date_from, date_to]:
         raise click.UsageError("Please provide all required parameters")
     moneymoney = MoneyMoney()
-    
+
     # Prepare dataframe
     console.log(f"Reading transactions from database from {date_from.strftime('%Y-%m-%d')} to {date_to.strftime('%Y-%m-%d')}...")
     df = pd.DataFrame(moneymoney.get_transactions(date_from, date_to, limit_to_account))
@@ -275,7 +272,7 @@ def train_model(config_profile, date_from: datetime.datetime, date_to, limit_to_
     else:
         limit_to_category = []
 
-    console.log ("Assessing training data...")
+    console.log("Assessing training data...")
     # Print table with category usage
     category_counts = df["category_uid"].value_counts()
     table = Table(title="Transactions used per category for training")
@@ -350,7 +347,7 @@ def train_model(config_profile, date_from: datetime.datetime, date_to, limit_to_
 @click.option("--limit-to-account", help="Limit training to transactions in the defined account. Can be provided multiple times", multiple=True)
 @click.option("--date-from", type=RelativeDate(), default="2Y", help="Oldest transaction to use for training (e.g., -1Y for one year ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
 @click.option("--date-to", type=RelativeDate(), default=datetime.datetime.now().strftime("%Y-%m-%d"), help="Newest transaction to use for training (e.g., -3M for three months ago or 2021-01-01 for an absolute date)", required=True, show_default=True)  # noqa: E501
-def list_transactions (config_profile, date_from, date_to, limit_to_account):
+def list_transactions(config_profile, date_from, date_to, limit_to_account):
     config = read_config(config_profile)
     date_from = date_from if date_from is not None else config.get("date_from")
     date_to = date_to if date_to is not None else config.get("date_to")
@@ -375,8 +372,6 @@ def list_transactions (config_profile, date_from, date_to, limit_to_account):
         )
 
     console.print(table)
-
-
 
 
 if __name__ == "__main__":

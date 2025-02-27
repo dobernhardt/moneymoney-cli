@@ -1,9 +1,13 @@
 import datetime
+import shutil
 
 import click
-
+import getch
 import joblib
+import numpy as np
 import pandas as pd
+import yaml
+from rich.table import Table
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
@@ -11,17 +15,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from .config import read_config
+from .console import console
 from .moneymoney import MoneyMoney
 from .relative_date import RelativeDate
-from .word_vec import Word2VecVectorizer
-from rich.table import Table
-import yaml
-from .console import console
-from .config import read_config
 from .version import __version__
-import numpy as np
-import getch
-import shutil
+from .word_vec import Word2VecVectorizer
 
 
 @click.group()

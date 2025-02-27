@@ -1,9 +1,10 @@
-import subprocess
-import plistlib
-from dataclasses import dataclass
-from .console import console
-import sys
 import pathlib
+import plistlib
+import subprocess
+import sys
+from dataclasses import dataclass
+
+from .console import console
 
 
 class MoneyMoney:

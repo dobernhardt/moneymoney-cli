@@ -222,7 +222,7 @@ def categorize(date_from, date_to, limit_to_account, model_name, overwrite, conf
             f"{row['amount']:.2f}",
             "\n".join(
                 [
-                    f"{i+1}. {category} (Probability: {probability:.2f})"
+                    f"{i + 1}. {category} (Probability: {probability:.2f})"
                     for i, (category, probability) in enumerate(zip(row["top_3_categories"], row["top_3_probabilities"]))
                 ]
             ),
